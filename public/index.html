@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GPA/CGPA Calculator | Created by Platinum</title>
+    <!-- Libraries for PDF/PNG export & charts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* CSS Styles (Included in full version below) */
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>GPA/CGPA Calculator</h1>
+        <p style="text-align: center; font-style: italic;">Created by Platinum</p>
+        
+        <!-- User Profile Section -->
+        <div class="user-id-section">
+            <h2>User Profile</h2>
+            <input type="text" id="userId" placeholder="Enter your user ID">
+            <button onclick="loadData()">Load Data</button>
+            <button onclick="saveData()" class="btn-success">Save Data</button>
+        </div>
+        
+        <!-- Grading System Key -->
+        <div class="grade-key">
+            <h3>Grading System (5-point scale)</h3>
+            <p><strong>A (5.0):</strong> 70 and above</p>
+            <p><strong>B (4.0):</strong> 60-69</p>
+            <p><strong>C (3.0):</strong> 50-59</p>
+            <p><strong>D (2.0):</strong> 40-49</p>
+            <p><strong>E (1.0):</strong> 30-39</p>
+            <p><strong>F (0.0):</strong> 20-29</p>
+        </div>
+        
+        <!-- Semester Management -->
+        <div id="semestersContainer"></div>
+        <button onclick="addSemester()" class="btn-success">Add Semester</button>
+        
+        <!-- CGPA Results & Export Options -->
+        <div class="results" id="cgpaResult" style="display: none;">
+            <h2>CGPA Result</h2>
+            <p><strong>CGPA:</strong> <span id="cgpaValue">0.00</span> / 5.00</p>
+            <p><strong>Total Credit Units:</strong> <span id="totalUnits">0</span></p>
+            <div id="classHonor"></div>
+            
+            <div class="export-options">
+                <button onclick="exportAsPDF()" class="btn-export">Export as PDF</button>
+                <button onclick="exportAsPNG()" class="btn-export">Export as PNG</button>
+                <button onclick="window.print()" class="btn-export">Print Results</button>
+            </div>
+        </div>
+        
+        <!-- Performance Analytics -->
+        <div class="container" id="analyticsContainer" style="display: none;">
+            <h2>Performance Analytics</h2>
+            <div class="analytics-grid">
+                <div class="chart-container">
+                    <h3>Grade Distribution</h3>
+                    <canvas id="gradeChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <h3>GPA Trend</h3>
+                    <canvas id="gpaTrendChart"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Course Search -->
+        <div class="container" id="searchContainer">
+            <h2>Course Search</h2>
+            <input type="text" id="searchInput" placeholder="Search courses by code or name">
+            <div id="searchResults" class="search-results"></div>
+        </div>
+        
+        <!-- Creator Contact Info -->
+        <div class="creator-info">
+            <h3>Contact the Creator</h3>
+            <p>Need help or have suggestions? Reach out to Platinum:</p>
+            <div class="contact-info">
+                <a href="https://wa.me/2349025713730" target="_blank">WhatsApp</a>
+                <a href="mailto:qlasisi15@gmail.com?subject=GPA%20Calculator%20Feedback&body=Hello%20Platinum,%20I%20have%20feedback%20about%20your%20GPA%20Calculator:" target="_blank">Email</a>
+            </div>
+            <button onclick="toggleDarkMode()" id="darkModeToggle">🌙 Dark Mode</button>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+let semesters = [];
+let isDarkMode = false;
+let gradeChart = null;
+let gpaTrendChart = null;
+
+// Initialize the app
+document.addEventListener('DOMContentLoaded', function() {
+    addSemester();
+    setupEventListeners();
+    loadThemePreference();
+});
+
+// Set up event listeners
+function setupEventListeners() {
+    document.getElementById('searchInput').addEventListener('input', searchCourses);
+    document.getElementById('darkModeToggle').addEventListener('click', toggleDarkMode);
+}
+
+// Load theme preference from localStorage
+function loadThemePreference() {
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'dark') {
+        toggleDarkMode();
+    }
+}
+
+// Semester Management
+function addSemester() {
+    const semesterId = semesters.length > 0 ? Math.max(...semesters.map(s => s.id)) + 1 : 1;
+    semesters.push({
+        id: semesterId,
+        name: `Semester ${semesterId}`,
+        courses: [],
+        gpa: 0,
+        totalUnits: 0
+    });
+    renderSemesters();
+}
+
+function removeSemester(semesterId) {
+    semesters = semesters.filter(s => s.id !== semesterId);
+    renderSemesters();
+}
+
+function updateSemesterName(semesterId, newName) {
+    const semester = semesters.find(s => s.id === semesterId);
+    if (semester) {
+        semester.name = newName;
+    }
+}
+
+// Course Management
+function addCourse(semesterId) {
+    const semester = semesters.find(s => s.id === semesterId);
+    if (semester) {
+        semester.courses.push({
+            id: Date.now(), // Unique ID for each course
+            code: '',
+            description: '',
+            units: 1,
+            score: 0
+        });
+        calculateSemesterGPA(semesterId);
+        renderSemesters();
+    }
+}
+
+function removeCourse(semesterId, courseId) {
+    const semester = semesters.find(s => s.id === semesterId);
+    if (semester) {
+        semester.courses = semester.courses.filter(c => c.id !== courseId);
+        calculateSemesterGPA(semesterId);
+        renderSemesters();
+    }
+}
+
+function updateCourse(semesterId, courseId, field, value) {
+    const semester = semesters.find(s => s.id === semesterId);
+    if (!semester) return;
+
+    const course = semester.courses.find(c => c.id === courseId);
+    if (!course) return;
+
+    if (field === 'units' || field === 'score') {
+        value = parseInt(value);
+        if (isNaN(value)) return;
+        
+        if (field === 'score') {
+            value = Math.min(100, Math.max(0, value)); // Clamp score between 0-100
+        } else if (field === 'units') {
+            value = Math.min(3, Math.max(1, value)); // Clamp units between 1-3
+        }
+    }
+
+    course[field] = value;
+    calculateSemesterGPA(semesterId);
+    renderSemesters();
+}
+
+// GPA Calculations
+function calculateGrade(score) {
+    if (score >= 70) return 'A';
+    if (score >= 60) return 'B';
+    if (score >= 50) return 'C';
+    if (score >= 40) return 'D';
+    if (score >= 30) return 'E';
+    return 'F';
+}
+
+function calculateGradePoint(score) {
+    if (score >= 70) return 5.0;
+    if (score >= 60) return 4.0;
+    if (score >= 50) return 3.0;
+    if (score >= 40) return 2.0;
+    if (score >= 30) return 1.0;
+    return 0.0;
+}
+
+function calculateSemesterGPA(semesterId) {
+    const semester = semesters.find(s => s.id === semesterId);
+    if (!semester) return;
+
+    let totalGradePoints = 0;
+    let totalUnits = 0;
+
+    semester.courses.forEach(course => {
+        const gradePoint = calculateGradePoint(course.score);
+        totalGradePoints += gradePoint * course.units;
+        totalUnits += course.units;
+    });
+
+    semester.gpa = totalUnits > 0 ? totalGradePoints / totalUnits : 0;
+    semester.totalUnits = totalUnits;
+}
+
+function calculateCGPA() {
+    let totalGradePoints = 0;
+    let totalUnits = 0;
+
+    semesters.forEach(semester => {
+        totalGradePoints += semester.gpa * semester.totalUnits;
+        totalUnits += semester.totalUnits;
+    });
+
+    const cgpa = totalUnits > 0 ? totalGradePoints / totalUnits : 0;
+    updateResultsDisplay(cgpa, totalUnits);
+    updateAnalytics();
+}
+
+function updateResultsDisplay(cgpa, totalUnits) {
+    const cgpaResult = document.getElementById('cgpaResult');
+    const analyticsContainer = document.getElementById('analyticsContainer');
+
+    if (semesters.length > 0 && semesters.some(s => s.courses.length > 0)) {
+        cgpaResult.style.display = 'block';
+        analyticsContainer.style.display = 'block';
+        document.getElementById('cgpaValue').textContent = cgpa.toFixed(2);
+        document.getElementById('totalUnits').textContent = totalUnits;
+        document.getElementById('classHonor').innerHTML = getClassHonor(cgpa);
+    } else {
+        cgpaResult.style.display = 'none';
+        analyticsContainer.style.display = 'none';
+    }
+}
+
+function getClassHonor(cgpa) {
+    if (cgpa >= 4.5) {
+        return `<div class="class-honor">🎉 Congratulations! First Class Honors 🎉</div>`;
+    } else if (cgpa >= 4.0) {
+        return `<div class="class-honor">👍 Second Class Upper Division</div>`;
+    } else if (cgpa >= 3.5) {
+        return `<div class="class-honor">👏 Second Class Lower Division</div>`;
+    } else if (cgpa >= 3.0) {
+        return `<div class="class-honor">🙂 Third Class Upper Division</div>`;
+    } else if (cgpa >= 2.5) {
+        return `<div class="class-honor">😐 Third Class Lower Division</div>`;
+    } else {
+        return `<div class="class-honor">😟 You can do better next time!</div>`;
+    }
+}
+
+// Rendering
+function renderSemesters() {
+    const container = document.getElementById('semestersContainer');
+    container.innerHTML = '';
+
+    semesters.forEach((semester, index) => {
+        const semesterDiv = document.createElement('div');
+        semesterDiv.className = 'semester';
+        semesterDiv.innerHTML = `
+            <div class="semester-header">
+                <h2>
+                    <input type="text" value="${semester.name}" 
+                           onchange="updateSemesterName(${semester.id}, this.value)"
+                           class="semester-name-input">
+                </h2>
+                ${index > 0 ? `<button onclick="removeSemester(${semester.id})" class="btn-danger">Remove Semester</button>` : ''}
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Course Code</th>
+                        <th>Description</th>
+                        <th>Units</th>
+                        <th>Score</th>
+                        <th>Grade</th>
+                        <th>Grade Point</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="coursesTable${semester.id}">
+                    ${renderCourses(semester.id)}
+                </tbody>
+            </table>
+            <button onclick="addCourse(${semester.id})">Add Course</button>
+            <div class="results">
+                <p><strong>GPA:</strong> ${semester.gpa.toFixed(2)} / 5.00</p>
+                <p><strong>Total Credit Units:</strong> ${semester.totalUnits}</p>
+            </div>
+        `;
+        container.appendChild(semesterDiv);
+    });
+
+    calculateCGPA();
+}
+
+function renderCourses(semesterId) {
+    const semester = semesters.find(s => s.id === semesterId);
+    if (!semester) return '';
+
+    return semester.courses.map(course => `
+        <tr>
+            <td><input type="text" value="${course.code}" 
+                      onchange="updateCourse(${semesterId}, ${course.id}, 'code', this.value)"></td>
+            <td><input type="text" value="${course.description}" 
+                      onchange="updateCourse(${semesterId}, ${course.id}, 'description', this.value)"></td>
+            <td>
+                <select onchange="updateCourse(${semesterId}, ${course.id}, 'units', this.value)">
+                    <option value="1" ${course.units === 1 ? 'selected' : ''}>1</option>
+                    <option value="2" ${course.units === 2 ? 'selected' : ''}>2</option>
+                    <option value="3" ${course.units === 3 ? 'selected' : ''}>3</option>
+                </select>
+            </td>
+            <td><input type="number" min="0" max="100" value="${course.score}" 
+                      onchange="updateCourse(${semesterId}, ${course.id}, 'score', this.value)"></td>
+            <td>${calculateGrade(course.score)}</td>
+            <td>${calculateGradePoint(course.score).toFixed(1)}</td>
+            <td><button onclick="removeCourse(${semesterId}, ${course.id})" class="btn-danger">Remove</button></td>
+        </tr>
+    `).join('');
+}
+
+// Analytics
+function updateAnalytics() {
+    updateGradeDistributionChart();
+    updateGpaTrendChart();
+}
+
+function updateGradeDistributionChart() {
+    const gradeCounts = {
+        A: 0, B: 0, C: 0, D: 0, E: 0, F: 0
+    };
+
+    semesters.forEach(semester => {
+        semester.courses.forEach(course => {
+            const grade = calculateGrade(course.score);
+            gradeCounts[grade]++;
+        });
+    });
+
+    const ctx = document.getElementById('gradeChart').getContext('2d');
+    
+    if (gradeChart) {
+        gradeChart.destroy();
+    }
+
+    gradeChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: ['A', 'B', 'C', 'D', 'E', 'F'],
+            datasets: [{
+                label: 'Grade Distribution',
+                data: Object.values(gradeCounts),
+                backgroundColor: [
+                    'rgba(75, 192, 192, 0.6)',
+                    'rgba(54, 162, 235, 0.6)',
+                    'rgba(255, 206, 86, 0.6)',
+                    'rgba(255, 159, 64, 0.6)',
+                    'rgba(153, 102, 255, 0.6)',
+                    'rgba(255, 99, 132, 0.6)'
+                ],
+                borderColor: [
+                    'rgba(75, 192, 192, 1)',
+                    'rgba(54, 162, 235, 1)',
+                    'rgba(255, 206, 86, 1)',
+                    'rgba(255, 159, 64, 1)',
+                    'rgba(153, 102, 255, 1)',
+                    'rgba(255, 99, 132, 1)'
+                ],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Number of Courses'
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Grades'
+                    }
+                }
+            }
+        }
+    });
+}
+
+function updateGpaTrendChart() {
+    const ctx = document.getElementById('gpaTrendChart').getContext('2d');
+    const labels = semesters.map(s => s.name);
+    const data = semesters.map(s => s.gpa);
+
+    if (gpaTrendChart) {
+        gpaTrendChart.destroy();
+    }
+
+    gpaTrendChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'GPA Trend',
+                data: data,
+                fill: false,
+                backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                tension: 0.1
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 5.0,
+                    title: {
+                        display: true,
+                        text: 'GPA'
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Semesters'
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Search Functionality
+function searchCourses() {
+    const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+    const resultsContainer = document.getElementById('searchResults');
+    
+    if (!searchTerm) {
+        resultsContainer.innerHTML = '';
+        return;
+    }
+
+    const results = [];
+    
+    semesters.forEach(semester => {
+        semester.courses.forEach(course => {
+            if (course.code.toLowerCase().includes(searchTerm) || 
+                course.description.toLowerCase().includes(searchTerm)) {
+                results.push({
+                    semester: semester.name,
+                    ...course
+                });
+            }
+        });
+    });
+
+    displaySearchResults(results);
+}
+
+function displaySearchResults(results) {
+    const resultsContainer = document.getElementById('searchResults');
+    
+    if (results.length === 0) {
+        resultsContainer.innerHTML = '<p>No courses found matching your search.</p>';
+        return;
+    }
+
+    resultsContainer.innerHTML = `
+        <table>
+            <thead>
+                <tr>
+                    <th>Semester</th>
+                    <th>Code</th>
+                    <th>Description</th>
+                    <th>Units</th>
+                    <th>Score</th>
+                    <th>Grade</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${results.map(course => `
+                    <tr>
+                        <td>${course.semester}</td>
+                        <td>${course.code}</td>
+                        <td>${course.description}</td>
+                        <td>${course.units}</td>
+                        <td>${course.score}</td>
+                        <td>${calculateGrade(course.score)}</td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+    `;
+}
+
+// Export Functions
+function exportAsPDF() {
+    const element = document.getElementById('cgpaResult');
+    const opt = {
+        margin: 10,
+        filename: 'GPA_Results.pdf',
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2 },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+    
+    html2pdf().from(element).set(opt).save();
+}
+
+function exportAsPNG() {
+    const element = document.getElementById('cgpaResult');
+    
+    html2canvas(element).then(canvas => {
+        const link = document.createElement('a');
+        link.download = 'GPA_Results.png';
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+    });
+}
+
+// Dark Mode Toggle
+function toggleDarkMode() {
+    document.body.classList.toggle('dark-mode');
+    isDarkMode = !isDarkMode;
+    
+    const toggleBtn = document.getElementById('darkModeToggle');
+    toggleBtn.textContent = isDarkMode ? '☀️ Light Mode' : '🌙 Dark Mode';
+    
+    // Save preference to localStorage
+    localStorage.setItem('theme', isDarkMode ? 'dark' : 'light');
+    
+    // Update charts if they exist
+    if (gradeChart) {
+        gradeChart.options.scales.x.grid.color = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
+        gradeChart.options.scales.y.grid.color = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
+        gradeChart.update();
+    }
+    
+    if (gpaTrendChart) {
+        gpaTrendChart.options.scales.x.grid.color = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
+        gpaTrendChart.options.scales.y.grid.color = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
+        gpaTrendChart.update();
+    }
+}
+
+// Data Persistence
+function saveData() {
+    const userId = document.getElementById('userId').value.trim();
+    if (!userId) {
+        alert('Please enter a user ID to save your data');
+        return;
+    }
+    
+    // For Vercel deployment, use the relative path
+    const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:3001' : '';
+    
+    fetch(`${API_BASE}/api/save`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userId, semesters }),
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Data saved successfully!');
+        } else {
+            alert('Failed to save data');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error saving data');
+    });
+}
+
+function loadData() {
+    const userId = document.getElementById('userId').value.trim();
+    if (!userId) {
+        alert('Please enter a user ID to load your data');
+        return;
+    }
+    
+    // For Vercel deployment, use the relative path
+    const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:3001' : '';
+    
+    fetch(`${API_BASE}/api/load/${userId}`)
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            semesters = data.semesters;
+            renderSemesters();
+            alert('Data loaded successfully!');
+        } else {
+            alert('User not found or no data available');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error loading data');
+    });
+}
+    </script>
+</body>
+</html>
