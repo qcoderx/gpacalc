@@ -11,13 +11,13 @@ app.use(bodyParser.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // API routes
-app.post('/api/save', (req, res) => {
+app.post('/API/save', (req, res) => {
     const { userId, semesters } = req.body;
     // In production, save to a database
     res.json({ success: true });
 });
 
-app.get('/api/load', (req, res) => {
+app.get('/API/load', (req, res) => {
     const { userId } = req.query;
     // In production, load from database
     res.json({ success: true, semesters: [] });
